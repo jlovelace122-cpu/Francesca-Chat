@@ -10,10 +10,6 @@
     {
       "src": "/api/chat",
       "dest": "/api/chat.py"
-    },
-    {
-      "src": "/(.*)",
-      "dest": "/public/$1"
     }
   ]
 }
