@@ -20,7 +20,7 @@
    *   "https://your-project.vercel.app/api/chat"
    * Leave empty string "" to use only the local keyword matcher.
    */
-  const API_URL = "/api/chat";
+  const API_URL = (window.location.hostname.includes("francescapmu") ? "https://francesca-chat-jordan-lovelaces-projects.vercel.app" : "") + "/api/chat";
 
   /** Conversation history sent to the API for context. */
   let conversationHistory = [];
