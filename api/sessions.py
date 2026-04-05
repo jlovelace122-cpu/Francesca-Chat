@@ -40,17 +40,6 @@ def sessions():
     if request.method == "OPTIONS":
         return ("", 204, cors)
 
-    # Debug: check if env var exists (temporary)
-    if request.args.get("debug") == "1":
-        admin_token = os.environ.get("ADMIN_TOKEN", "")
-        resp = jsonify({
-            "env_set": bool(admin_token),
-            "env_len": len(admin_token),
-            "env_vars": [k for k in os.environ if "ADMIN" in k or "TURSO" in k],
-        })
-        resp.headers.update(cors)
-        return resp
-
     if not _check_auth():
         resp = jsonify({"status": "error", "error": "Unauthorized"})
         resp.headers.update(cors)
