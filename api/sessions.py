@@ -14,10 +14,12 @@ ADMIN_TOKEN = os.environ.get("ADMIN_TOKEN", "")
 
 def _check_auth():
     """Verify admin token from Authorization header or query param."""
+    # Re-read env var each time (Vercel can set it after module load)
+    admin_token = os.environ.get("ADMIN_TOKEN", "")
     token = request.headers.get("Authorization", "").replace("Bearer ", "")
     if not token:
         token = request.args.get("token", "")
-    if not ADMIN_TOKEN or token != ADMIN_TOKEN:
+    if not admin_token or token != admin_token:
         return False
     return True
 
@@ -37,6 +39,17 @@ def sessions():
 
     if request.method == "OPTIONS":
         return ("", 204, cors)
+
+    # Debug: check if env var exists (temporary)
+    if request.args.get("debug") == "1":
+        admin_token = os.environ.get("ADMIN_TOKEN", "")
+        resp = jsonify({
+            "env_set": bool(admin_token),
+            "env_len": len(admin_token),
+            "env_vars": [k for k in os.environ if "ADMIN" in k or "TURSO" in k],
+        })
+        resp.headers.update(cors)
+        return resp
 
     if not _check_auth():
         resp = jsonify({"status": "error", "error": "Unauthorized"})

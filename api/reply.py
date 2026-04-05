@@ -13,10 +13,11 @@ ADMIN_TOKEN = os.environ.get("ADMIN_TOKEN", "")
 
 
 def _check_auth():
+    admin_token = os.environ.get("ADMIN_TOKEN", "")
     token = request.headers.get("Authorization", "").replace("Bearer ", "")
     if not token:
         token = request.args.get("token", "")
-    if not ADMIN_TOKEN or token != ADMIN_TOKEN:
+    if not admin_token or token != admin_token:
         return False
     return True
 
