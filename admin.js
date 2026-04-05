@@ -13,6 +13,13 @@
   let pollInterval = null;
   let sessionPollInterval = null;
 
+  // ── Notification state ──
+  let knownSessionIds = new Set();
+  let firstLoad = true;
+  let alertsEnabled = true;
+  let flashInterval = null;
+  const ORIGINAL_TITLE = document.title;
+
   /* ─────────────────────── AUTH ─────────────────────── */
 
   function doLogin() {
@@ -101,6 +108,7 @@
       if (!data || data.status !== "ok") return false;
       renderSessions(data.sessions);
       updateStats(data.sessions);
+      detectNewChats(data.sessions);
       return true;
     } catch {
       return false;
@@ -387,6 +395,109 @@
     ).join("") || "<tr><td colspan='2'>No referrer data yet</td></tr>";
   }
 
+  /* ─────────────────────── NOTIFICATIONS ─────────────────────── */
+
+  function detectNewChats(sessions) {
+    if (!sessions) return;
+    const currentIds = new Set(sessions.map((s) => s.id));
+
+    if (firstLoad) {
+      knownSessionIds = currentIds;
+      firstLoad = false;
+      return;
+    }
+
+    const newSessions = sessions.filter((s) => !knownSessionIds.has(s.id));
+    if (newSessions.length > 0 && alertsEnabled) {
+      newSessions.forEach((s) => {
+        fireAlert(s);
+      });
+    }
+    knownSessionIds = currentIds;
+  }
+
+  function fireAlert(session) {
+    const page = session.visitor_page || "unknown page";
+    const name = session.visitor_name || "Visitor";
+
+    // 1. Sound
+    playAlertSound();
+
+    // 2. Browser notification
+    if (Notification.permission === "granted") {
+      const n = new Notification("💬 New Chat!", {
+        body: `${name} started a chat on ${page}`,
+        icon: "data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>💬</text></svg>",
+        tag: "fc-new-chat-" + session.id,
+      });
+      n.onclick = () => { window.focus(); n.close(); };
+      setTimeout(() => n.close(), 8000);
+    }
+
+    // 3. Flash tab title
+    startTitleFlash();
+
+    // 4. Pulse the status dot
+    const dot = document.getElementById("status-dot");
+    if (dot) { dot.classList.add("pulse"); setTimeout(() => dot.classList.remove("pulse"), 5000); }
+  }
+
+  function playAlertSound() {
+    try {
+      const ctx = new (window.AudioContext || window.webkitAudioContext)();
+      // Two-tone chime
+      [0, 0.15].forEach((delay, i) => {
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.connect(gain);
+        gain.connect(ctx.destination);
+        osc.type = "sine";
+        osc.frequency.value = i === 0 ? 880 : 1100;
+        gain.gain.setValueAtTime(0.3, ctx.currentTime + delay);
+        gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + delay + 0.4);
+        osc.start(ctx.currentTime + delay);
+        osc.stop(ctx.currentTime + delay + 0.4);
+      });
+    } catch (_e) { /* silent */ }
+  }
+
+  function startTitleFlash() {
+    if (flashInterval) return;
+    let on = true;
+    flashInterval = setInterval(() => {
+      document.title = on ? "🔔 New Chat!" : ORIGINAL_TITLE;
+      on = !on;
+    }, 800);
+    // Stop flashing when window gets focus
+    const stopFlash = () => {
+      clearInterval(flashInterval);
+      flashInterval = null;
+      document.title = ORIGINAL_TITLE;
+      window.removeEventListener("focus", stopFlash);
+    };
+    window.addEventListener("focus", stopFlash);
+  }
+
+  function toggleAlerts() {
+    alertsEnabled = !alertsEnabled;
+    const btn = document.getElementById("alert-toggle");
+    if (btn) {
+      btn.textContent = alertsEnabled ? "🔔" : "🔕";
+      btn.title = alertsEnabled ? "Alerts ON — click to mute" : "Alerts OFF — click to unmute";
+    }
+    // Request notification permission on first enable
+    if (alertsEnabled && Notification.permission === "default") {
+      Notification.requestPermission();
+    }
+  }
+
+  // Request notification permission on login
+  function requestNotifPermission() {
+    if ("Notification" in window && Notification.permission === "default") {
+      Notification.requestPermission();
+    }
+  }
+
   /* ─────────────────────── HELPERS ─────────────────────── */
 
   function escHtml(str) {
@@ -443,8 +554,10 @@
   window.sendReply = sendReply;
   window.closeSession = closeSession;
   window.setPeriod = setPeriod;
+  window.toggleAlerts = toggleAlerts;
 
   // Boot
   tryAutoLogin();
+  requestNotifPermission();
 
 })();
