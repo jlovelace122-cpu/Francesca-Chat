@@ -224,14 +224,13 @@
   function updateStats(sessions) {
     if (!sessions) return;
     const total = sessions.length;
-    const active = sessions.filter((s) => s.status !== "closed").length;
     const live = sessions.filter((s) => s.status === "live").length;
     const totalMsgs = sessions.reduce((sum, s) => sum + (s.message_count || 0), 0);
 
-    document.getElementById("stat-total").textContent = total;
-    document.getElementById("stat-active").textContent = active;
-    document.getElementById("stat-live").textContent = live;
-    document.getElementById("stat-messages").textContent = totalMsgs;
+    const el = (id) => document.getElementById(id);
+    if (el("stat-total")) el("stat-total").textContent = total;
+    if (el("stat-live")) el("stat-live").textContent = live;
+    if (el("stat-messages")) el("stat-messages").textContent = totalMsgs;
   }
 
   /* ─────────────────────── SESSION SELECTION ─────────────────────── */
