@@ -347,9 +347,9 @@ body {
 
 .stats-grid {
   display: grid;
-  grid-template-columns: repeat(4, 1fr);
+  grid-template-columns: repeat(5, 1fr);
   gap: 1rem;
-  margin-bottom: 2rem;
+  margin-bottom: 1.5rem;
 }
 
 .stat-card {
@@ -433,5 +433,109 @@ body {
   .chat-view { display: none; }
   .chat-layout.viewing .session-list { display: none; }
   .chat-layout.viewing .chat-view { display: flex; }
+  .stats-grid { grid-template-columns: repeat(2, 1fr); }
+}
+
+/* ─────────────── ANALYTICS DASHBOARD ─────────────── */
+
+.analytics-toolbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 1.5rem;
+}
+
+.analytics-title {
+  font-size: 1.3rem;
+  font-weight: 700;
+  color: #d4a574;
+}
+
+.period-selector {
+  display: flex;
+  gap: 0.4rem;
+}
+
+.period-btn {
+  padding: 0.35rem 0.8rem;
+  border-radius: 6px;
+  border: 1px solid #444;
+  background: transparent;
+  color: #ccc;
+  cursor: pointer;
+  font-size: 0.85rem;
+  transition: all 0.2s;
+}
+
+.period-btn:hover {
+  border-color: #d4a574;
+  color: #d4a574;
+}
+
+.period-btn.active {
+  background: #d4a574;
+  color: #1a1a2e;
+  border-color: #d4a574;
+  font-weight: 600;
+}
+
+.charts-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1rem;
+  margin-bottom: 1rem;
+}
+
+.chart-card {
+  background: #1e1e32;
+  border-radius: 10px;
+  padding: 1.2rem;
+  border: 1px solid #333;
+}
+
+.chart-card h3 {
+  margin: 0 0 0.8rem 0;
+  font-size: 0.95rem;
+  color: #aaa;
+  font-weight: 500;
+}
+
+.chart-card canvas {
+  width: 100% !important;
+  height: 220px !important;
+}
+
+.chart-card-small canvas {
+  height: 200px !important;
+}
+
+.analytics-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.9rem;
+}
+
+.analytics-table th {
+  text-align: left;
+  color: #888;
+  font-weight: 500;
+  padding: 0.5rem 0.5rem;
+  border-bottom: 1px solid #333;
+}
+
+.analytics-table td {
+  padding: 0.45rem 0.5rem;
+  color: #ddd;
+  border-bottom: 1px solid #2a2a3e;
+}
+
+.analytics-table td:last-child,
+.analytics-table th:last-child {
+  text-align: right;
+}
+
+@media (max-width: 700px) {
+  .charts-row { grid-template-columns: 1fr; }
+  .analytics-toolbar { flex-direction: column; gap: 0.8rem; align-items: flex-start; }
   .stats-grid { grid-template-columns: repeat(2, 1fr); }
 }

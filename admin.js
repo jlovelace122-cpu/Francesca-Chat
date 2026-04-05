@@ -70,6 +70,7 @@
     document.querySelector(`.tab[data-tab="${tab}"]`).classList.add("active");
     document.querySelectorAll(".tab-content").forEach((tc) => tc.classList.add("hidden"));
     document.getElementById(`tab-${tab}`).classList.remove("hidden");
+    if (tab === "analytics") loadAnalytics();
   }
 
   /* ─────────────────────── FILTERS ─────────────────────── */
@@ -275,27 +276,116 @@
     if (pollInterval) clearInterval(pollInterval);
   }
 
-  /* ─────────────────────── GA EMBED ─────────────────────── */
+  /* ─────────────────────── ANALYTICS DASHBOARD ─────────────────────── */
 
-  function setGAEmbed() {
-    const url = document.getElementById("ga-embed-url").value.trim();
-    if (!url) return;
-    localStorage.setItem("fc_ga_embed_url", url);
-    loadGAEmbed(url);
+  let analyticsPeriod = 30;
+  let trafficChart = null;
+  let chatsChart = null;
+  let devicesChart = null;
+
+  function setPeriod(days) {
+    analyticsPeriod = days;
+    document.querySelectorAll(".period-btn").forEach((b) => b.classList.remove("active"));
+    document.querySelector(`.period-btn[data-days="${days}"]`).classList.add("active");
+    loadAnalytics();
   }
 
-  function loadGAEmbed(url) {
-    const container = document.getElementById("ga-embed-container");
-    container.innerHTML = `<iframe src="${escHtml(url)}" allowfullscreen></iframe>`;
+  async function loadAnalytics() {
+    try {
+      const data = await apiFetch(`/api/analytics?days=${analyticsPeriod}`);
+      if (!data || data.status !== "ok") return;
+      renderAnalytics(data);
+    } catch (_e) { /* silent */ }
   }
 
-  // Restore saved GA embed URL
-  function restoreGAEmbed() {
-    const saved = localStorage.getItem("fc_ga_embed_url");
-    if (saved) {
-      document.getElementById("ga-embed-url").value = saved;
-      loadGAEmbed(saved);
+  function renderAnalytics(data) {
+    const t = data.traffic;
+    const c = data.chat;
+
+    // Stat cards
+    document.getElementById("stat-views").textContent = t.total_views.toLocaleString();
+    document.getElementById("stat-visitors").textContent = t.unique_visitors.toLocaleString();
+    document.getElementById("stat-total").textContent = c.total_chats.toLocaleString();
+    document.getElementById("stat-messages").textContent = c.total_messages.toLocaleString();
+    document.getElementById("stat-live").textContent = c.live_takeovers.toLocaleString();
+
+    // Traffic chart
+    const chartOpts = {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: { legend: { display: false } },
+      scales: {
+        x: { ticks: { color: "#aaa", maxTicksLimit: 10 }, grid: { color: "rgba(255,255,255,0.05)" } },
+        y: { ticks: { color: "#aaa" }, grid: { color: "rgba(255,255,255,0.05)" }, beginAtZero: true },
+      },
+    };
+
+    if (trafficChart) trafficChart.destroy();
+    trafficChart = new Chart(document.getElementById("chart-traffic"), {
+      type: "line",
+      data: {
+        labels: t.views_per_day.map((d) => d.day.slice(5)),
+        datasets: [{
+          label: "Page Views",
+          data: t.views_per_day.map((d) => d.views),
+          borderColor: "#d4a574",
+          backgroundColor: "rgba(212,165,116,0.15)",
+          fill: true,
+          tension: 0.3,
+        }],
+      },
+      options: chartOpts,
+    });
+
+    // Chats chart
+    if (chatsChart) chatsChart.destroy();
+    chatsChart = new Chart(document.getElementById("chart-chats"), {
+      type: "bar",
+      data: {
+        labels: c.chats_per_day.map((d) => d.day.slice(5)),
+        datasets: [{
+          label: "Chats",
+          data: c.chats_per_day.map((d) => d.chats),
+          backgroundColor: "rgba(212,165,116,0.6)",
+          borderRadius: 4,
+        }],
+      },
+      options: chartOpts,
+    });
+
+    // Devices chart
+    if (devicesChart) devicesChart.destroy();
+    if (t.devices.length > 0) {
+      devicesChart = new Chart(document.getElementById("chart-devices"), {
+        type: "doughnut",
+        data: {
+          labels: t.devices.map((d) => d.device),
+          datasets: [{
+            data: t.devices.map((d) => d.views),
+            backgroundColor: ["#d4a574", "#8b6f47", "#c9a96e"],
+          }],
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: {
+            legend: { position: "bottom", labels: { color: "#ccc" } },
+          },
+        },
+      });
     }
+
+    // Top pages table
+    const pagesBody = document.querySelector("#table-pages tbody");
+    pagesBody.innerHTML = t.top_pages.map((p) =>
+      `<tr><td>${escHtml(p.path)}</td><td>${p.views}</td></tr>`
+    ).join("") || "<tr><td colspan='2'>No data yet</td></tr>";
+
+    // Top referrers table
+    const refBody = document.querySelector("#table-referrers tbody");
+    refBody.innerHTML = t.top_referrers.map((r) =>
+      `<tr><td>${escHtml(truncate(r.referrer, 60))}</td><td>${r.views}</td></tr>`
+    ).join("") || "<tr><td colspan='2'>No referrer data yet</td></tr>";
   }
 
   /* ─────────────────────── HELPERS ─────────────────────── */
@@ -353,10 +443,9 @@
   window.selectSession = selectSession;
   window.sendReply = sendReply;
   window.closeSession = closeSession;
-  window.setGAEmbed = setGAEmbed;
+  window.setPeriod = setPeriod;
 
   // Boot
   tryAutoLogin();
-  restoreGAEmbed();
 
 })();

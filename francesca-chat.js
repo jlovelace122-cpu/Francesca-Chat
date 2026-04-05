@@ -27,6 +27,7 @@
     ? "https://francesca-chat-jordan-lovelaces-projects.vercel.app"
     : "";
   const POLL_URL = API_BASE + "/api/poll";
+  const TRACK_URL = API_BASE + "/api/track";
 
   /** Conversation history sent to the API for context. */
   let conversationHistory = [];
@@ -874,8 +875,25 @@
       }
     }, 3000);
 
+    // Track page view (fire-and-forget)
+    trackPageView();
+
     // Start polling for operator messages
     startOperatorPolling();
+  }
+
+  /** Track a page view (once per page load). */
+  function trackPageView() {
+    try {
+      const payload = {
+        url: window.location.href,
+        referrer: document.referrer || "",
+        visitor_id: sessionId || "",
+      };
+      navigator.sendBeacon
+        ? navigator.sendBeacon(TRACK_URL, new Blob([JSON.stringify(payload)], { type: "application/json" }))
+        : fetch(TRACK_URL, { method: "POST", body: JSON.stringify(payload), headers: { "Content-Type": "application/json" }, keepalive: true }).catch(() => {});
+    } catch (_e) { /* silent */ }
   }
 
   /** Poll for operator (human) messages every 4 seconds. */

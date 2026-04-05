@@ -62,6 +62,17 @@ def _ensure_tables(client):
         "CREATE INDEX IF NOT EXISTS idx_sessions_updated ON chat_sessions(updated_at DESC)",
         "CREATE INDEX IF NOT EXISTS idx_sessions_status ON chat_sessions(status)",
         "CREATE INDEX IF NOT EXISTS idx_messages_session ON chat_messages(session_id, created_at)",
+        """CREATE TABLE IF NOT EXISTS page_views (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            url TEXT NOT NULL,
+            path TEXT NOT NULL DEFAULT '/',
+            referrer TEXT DEFAULT '',
+            user_agent TEXT DEFAULT '',
+            visitor_id TEXT DEFAULT '',
+            created_at TEXT DEFAULT (datetime('now'))
+        )""",
+        "CREATE INDEX IF NOT EXISTS idx_pageviews_created ON page_views(created_at DESC)",
+        "CREATE INDEX IF NOT EXISTS idx_pageviews_path ON page_views(path, created_at)",
     ])
     _tables_ready = True
 

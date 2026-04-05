@@ -5,6 +5,8 @@
     { "src": "api/sessions.py", "use": "@vercel/python" },
     { "src": "api/reply.py", "use": "@vercel/python" },
     { "src": "api/poll.py", "use": "@vercel/python" },
+    { "src": "api/track.py", "use": "@vercel/python" },
+    { "src": "api/analytics.py", "use": "@vercel/python" },
     { "src": "index.html", "use": "@vercel/static" },
     { "src": "francesca-chat.js", "use": "@vercel/static" },
     { "src": "admin.html", "use": "@vercel/static" },
@@ -17,6 +19,8 @@
     { "src": "/api/reply", "dest": "/api/reply.py" },
     { "src": "/api/messages", "dest": "/api/reply.py" },
     { "src": "/api/poll", "dest": "/api/poll.py" },
+    { "src": "/api/track", "dest": "/api/track.py" },
+    { "src": "/api/analytics", "dest": "/api/analytics.py" },
     {
       "src": "/francesca-chat.js",
       "dest": "/francesca-chat.js",
