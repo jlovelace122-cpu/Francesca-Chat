@@ -289,24 +289,22 @@ def chat():
         resp.headers.update(cors)
         return resp, 400
 
-    # ── Store message in Supabase (non-blocking, best-effort) ──
+    # ── Store message in Turso (best-effort, won't break chat if DB is down) ──
     try:
-        from api._supabase import get_supabase
-        sb = get_supabase()
-        if sb and session_id:
+        from api._db import execute
+        if session_id:
             # Upsert session
-            sb.table("chat_sessions").upsert({
-                "id": session_id,
-                "visitor_page": visitor_page or None,
-                "status": "bot",
-                "unread_count": 0,
-            }, on_conflict="id").execute()
+            execute(
+                "INSERT INTO chat_sessions (id, visitor_page, status, unread_count) "
+                "VALUES (?, ?, 'bot', 0) "
+                "ON CONFLICT(id) DO UPDATE SET visitor_page = ?, updated_at = datetime('now')",
+                [session_id, visitor_page, visitor_page]
+            )
             # Store visitor message
-            sb.table("chat_messages").insert({
-                "session_id": session_id,
-                "sender": "visitor",
-                "content": user_message,
-            }).execute()
+            execute(
+                "INSERT INTO chat_messages (session_id, sender, content) VALUES (?, 'visitor', ?)",
+                [session_id, user_message]
+            )
     except Exception:
         pass  # Don't let DB errors break the chat
 
@@ -341,16 +339,17 @@ def chat():
 
         reply = completion.choices[0].message.content
 
-        # Store bot reply in Supabase
+        # Store bot reply in Turso
         try:
-            if sb and session_id:
-                sb.table("chat_messages").insert({
-                    "session_id": session_id,
-                    "sender": "bot",
-                    "content": reply,
-                }).execute()
-                # Increment unread count for admin dashboard
-                sb.rpc("increment_unread", {"sid": session_id}).execute()
+            if session_id:
+                execute(
+                    "INSERT INTO chat_messages (session_id, sender, content) VALUES (?, 'bot', ?)",
+                    [session_id, reply]
+                )
+                execute(
+                    "UPDATE chat_sessions SET unread_count = unread_count + 1, updated_at = datetime('now') WHERE id = ?",
+                    [session_id]
+                )
         except Exception:
             pass
 

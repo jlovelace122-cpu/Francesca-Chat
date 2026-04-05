@@ -1,6 +1,7 @@
 """
 Francesca Chat — Admin Sessions API
 Lists chat sessions for the admin dashboard.
+Powered by Turso (libsql).
 """
 
 import os
@@ -43,43 +44,38 @@ def sessions():
         return resp, 401
 
     try:
-        from api._supabase import get_supabase
-        sb = get_supabase()
-        if not sb:
-            resp = jsonify({"status": "error", "error": "Database not configured"})
-            resp.headers.update(cors)
-            return resp, 503
+        from api._db import execute, rows_to_dicts
 
         status_filter = request.args.get("status", "")
 
-        query = sb.table("chat_sessions").select("*").order("updated_at", desc=True).limit(100)
-
         if status_filter:
-            query = query.eq("status", status_filter)
-
-        result = query.execute()
-
-        # Get last message preview for each session
-        sessions_data = []
-        for s in result.data:
-            last_msg = (
-                sb.table("chat_messages")
-                .select("content, sender, created_at")
-                .eq("session_id", s["id"])
-                .order("created_at", desc=True)
-                .limit(1)
-                .execute()
+            rows = execute(
+                "SELECT * FROM chat_sessions WHERE status = ? ORDER BY updated_at DESC LIMIT 100",
+                [status_filter],
             )
-            s["last_message"] = last_msg.data[0] if last_msg.data else None
-            # Count total messages
-            msg_count = (
-                sb.table("chat_messages")
-                .select("id", count="exact")
-                .eq("session_id", s["id"])
-                .execute()
+        else:
+            rows = execute(
+                "SELECT * FROM chat_sessions ORDER BY updated_at DESC LIMIT 100"
             )
-            s["message_count"] = msg_count.count or 0
-            sessions_data.append(s)
+
+        sessions_data = rows_to_dicts(rows)
+
+        # Get last message preview + count for each session
+        for s in sessions_data:
+            last_msg = execute(
+                "SELECT content, sender, created_at FROM chat_messages "
+                "WHERE session_id = ? ORDER BY created_at DESC LIMIT 1",
+                [s["id"]],
+            )
+            last_list = rows_to_dicts(last_msg)
+            s["last_message"] = last_list[0] if last_list else None
+
+            count_rs = execute(
+                "SELECT COUNT(*) AS cnt FROM chat_messages WHERE session_id = ?",
+                [s["id"]],
+            )
+            count_list = rows_to_dicts(count_rs)
+            s["message_count"] = count_list[0]["cnt"] if count_list else 0
 
         resp = jsonify({"status": "ok", "sessions": sessions_data})
         resp.headers.update(cors)

@@ -1,6 +1,7 @@
 """
 Francesca Chat — Widget Polling API
 Widget polls this endpoint for new operator messages.
+Powered by Turso (libsql).
 """
 
 import os
@@ -47,39 +48,36 @@ def poll():
         return resp
 
     try:
-        from api._supabase import get_supabase
-        sb = get_supabase()
-        if not sb:
-            resp = jsonify({"status": "ok", "messages": []})
-            resp.headers.update(cors)
-            return resp
-
-        query = (
-            sb.table("chat_messages")
-            .select("content, sender, created_at")
-            .eq("session_id", session_id)
-            .eq("sender", "operator")
-            .order("created_at", desc=False)
-        )
+        from api._db import execute, rows_to_dicts
 
         if after:
-            query = query.gt("created_at", after)
+            rows = execute(
+                "SELECT content, sender, created_at FROM chat_messages "
+                "WHERE session_id = ? AND sender = 'operator' AND created_at > ? "
+                "ORDER BY created_at ASC",
+                [session_id, after],
+            )
+        else:
+            rows = execute(
+                "SELECT content, sender, created_at FROM chat_messages "
+                "WHERE session_id = ? AND sender = 'operator' "
+                "ORDER BY created_at ASC",
+                [session_id],
+            )
 
-        result = query.execute()
+        msgs = rows_to_dicts(rows)
 
         # Also get session status
-        session = (
-            sb.table("chat_sessions")
-            .select("status")
-            .eq("id", session_id)
-            .limit(1)
-            .execute()
+        status_rs = execute(
+            "SELECT status FROM chat_sessions WHERE id = ? LIMIT 1",
+            [session_id],
         )
-        status = session.data[0]["status"] if session.data else "bot"
+        status_list = rows_to_dicts(status_rs)
+        status = status_list[0]["status"] if status_list else "bot"
 
         resp = jsonify({
             "status": "ok",
-            "messages": result.data,
+            "messages": msgs,
             "session_status": status,
         })
         resp.headers.update(cors)

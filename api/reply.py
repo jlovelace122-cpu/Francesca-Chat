@@ -1,6 +1,7 @@
 """
 Francesca Chat — Operator Reply API
 Allows Francesca to send messages to active chat sessions.
+Powered by Turso (libsql).
 """
 
 import os
@@ -23,7 +24,7 @@ def _check_auth():
 def _cors_headers():
     return {
         "Access-Control-Allow-Origin": "*",
-        "Access-Control-Allow-Methods": "POST, OPTIONS",
+        "Access-Control-Allow-Methods": "POST, GET, OPTIONS",
         "Access-Control-Allow-Headers": "Content-Type, Authorization",
         "Access-Control-Max-Age": "86400",
     }
@@ -51,25 +52,19 @@ def reply():
         return resp, 400
 
     try:
-        from api._supabase import get_supabase
-        sb = get_supabase()
-        if not sb:
-            resp = jsonify({"status": "error", "error": "Database not configured"})
-            resp.headers.update(cors)
-            return resp, 503
+        from api._db import execute
 
         # Store operator message
-        sb.table("chat_messages").insert({
-            "session_id": session_id,
-            "sender": "operator",
-            "content": message,
-        }).execute()
+        execute(
+            "INSERT INTO chat_messages (session_id, sender, content) VALUES (?, 'operator', ?)",
+            [session_id, message],
+        )
 
         # Update session status to 'live' and reset unread
-        sb.table("chat_sessions").update({
-            "status": "live",
-            "unread_count": 0,
-        }).eq("id", session_id).execute()
+        execute(
+            "UPDATE chat_sessions SET status = 'live', unread_count = 0, updated_at = datetime('now') WHERE id = ?",
+            [session_id],
+        )
 
         resp = jsonify({"status": "ok"})
         resp.headers.update(cors)
@@ -101,25 +96,21 @@ def messages():
         return resp, 400
 
     try:
-        from api._supabase import get_supabase
-        sb = get_supabase()
-        if not sb:
-            resp = jsonify({"status": "error", "error": "Database not configured"})
-            resp.headers.update(cors)
-            return resp, 503
+        from api._db import execute, rows_to_dicts
 
-        result = (
-            sb.table("chat_messages")
-            .select("*")
-            .eq("session_id", session_id)
-            .order("created_at", desc=False)
-            .execute()
+        rows = execute(
+            "SELECT * FROM chat_messages WHERE session_id = ? ORDER BY created_at ASC",
+            [session_id],
         )
+        msgs = rows_to_dicts(rows)
 
         # Mark session as read
-        sb.table("chat_sessions").update({"unread_count": 0}).eq("id", session_id).execute()
+        execute(
+            "UPDATE chat_sessions SET unread_count = 0 WHERE id = ?",
+            [session_id],
+        )
 
-        resp = jsonify({"status": "ok", "messages": result.data})
+        resp = jsonify({"status": "ok", "messages": msgs})
         resp.headers.update(cors)
         return resp
 
