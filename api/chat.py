@@ -281,11 +281,34 @@ def chat():
     data = request.get_json(silent=True) or {}
     user_message = (data.get("message") or "").strip()
     history = data.get("history") or []
+    session_id = (data.get("session_id") or "").strip()
+    visitor_page = (data.get("page") or "").strip()
 
     if not user_message:
         resp = jsonify({"status": "error", "error": "No message provided."})
         resp.headers.update(cors)
         return resp, 400
+
+    # ── Store message in Supabase (non-blocking, best-effort) ──
+    try:
+        from api._supabase import get_supabase
+        sb = get_supabase()
+        if sb and session_id:
+            # Upsert session
+            sb.table("chat_sessions").upsert({
+                "id": session_id,
+                "visitor_page": visitor_page or None,
+                "status": "bot",
+                "unread_count": 0,
+            }, on_conflict="id").execute()
+            # Store visitor message
+            sb.table("chat_messages").insert({
+                "session_id": session_id,
+                "sender": "visitor",
+                "content": user_message,
+            }).execute()
+    except Exception:
+        pass  # Don't let DB errors break the chat
 
     api_key = os.environ.get("OPENAI_API_KEY", "")
     if not api_key:
@@ -317,7 +340,21 @@ def chat():
         )
 
         reply = completion.choices[0].message.content
-        resp = jsonify({"status": "ok", "reply": reply})
+
+        # Store bot reply in Supabase
+        try:
+            if sb and session_id:
+                sb.table("chat_messages").insert({
+                    "session_id": session_id,
+                    "sender": "bot",
+                    "content": reply,
+                }).execute()
+                # Increment unread count for admin dashboard
+                sb.rpc("increment_unread", {"sid": session_id}).execute()
+        except Exception:
+            pass
+
+        resp = jsonify({"status": "ok", "reply": reply, "session_id": session_id})
         resp.headers.update(cors)
         return resp
 

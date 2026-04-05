@@ -1,35 +1,33 @@
 {
   "version": 2,
   "builds": [
-    {
-      "src": "api/chat.py",
-      "use": "@vercel/python"
-    },
-    {
-      "src": "index.html",
-      "use": "@vercel/static"
-    },
-    {
-      "src": "francesca-chat.js",
-      "use": "@vercel/static"
-    }
+    { "src": "api/chat.py", "use": "@vercel/python" },
+    { "src": "api/sessions.py", "use": "@vercel/python" },
+    { "src": "api/reply.py", "use": "@vercel/python" },
+    { "src": "api/poll.py", "use": "@vercel/python" },
+    { "src": "index.html", "use": "@vercel/static" },
+    { "src": "francesca-chat.js", "use": "@vercel/static" },
+    { "src": "admin.html", "use": "@vercel/static" },
+    { "src": "admin.js", "use": "@vercel/static" },
+    { "src": "admin.css", "use": "@vercel/static" }
   ],
   "routes": [
-    {
-      "src": "/api/chat",
-      "dest": "/api/chat.py"
-    },
+    { "src": "/api/chat", "dest": "/api/chat.py" },
+    { "src": "/api/sessions", "dest": "/api/sessions.py" },
+    { "src": "/api/reply", "dest": "/api/reply.py" },
+    { "src": "/api/messages", "dest": "/api/reply.py" },
+    { "src": "/api/poll", "dest": "/api/poll.py" },
     {
       "src": "/francesca-chat.js",
       "dest": "/francesca-chat.js",
       "headers": {
         "Access-Control-Allow-Origin": "*",
-        "Cache-Control": "public, max-age=3600"
+        "Cache-Control": "public, max-age=300"
       }
     },
-    {
-      "src": "/(.*)",
-      "dest": "/index.html"
-    }
+    { "src": "/admin.js", "dest": "/admin.js" },
+    { "src": "/admin.css", "dest": "/admin.css" },
+    { "src": "/admin", "dest": "/admin.html" },
+    { "src": "/(.*)", "dest": "/index.html" }
   ]
 }

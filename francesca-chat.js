@@ -22,11 +22,34 @@
    */
   const API_URL = (window.location.hostname.includes("francescapmu") ? "https://francesca-chat-jordan-lovelaces-projects.vercel.app" : "") + "/api/chat";
 
+  /** Base URL for API calls (auto-detected for cross-domain). */
+  const API_BASE = window.location.hostname.includes("francescapmu")
+    ? "https://francesca-chat-jordan-lovelaces-projects.vercel.app"
+    : "";
+  const POLL_URL = API_BASE + "/api/poll";
+
   /** Conversation history sent to the API for context. */
   let conversationHistory = [];
 
   /** Max history pairs to send (keeps token usage reasonable). */
   const MAX_HISTORY = 20;
+
+  /** Session ID for tracking conversations (persisted in localStorage). */
+  let sessionId = localStorage.getItem("fc_session_id") || "";
+  if (!sessionId) {
+    sessionId = "fc_" + Date.now() + "_" + Math.random().toString(36).slice(2, 9);
+    localStorage.setItem("fc_session_id", sessionId);
+  }
+
+  /** Polling state for operator messages. */
+  let pollTimer = null;
+  let lastPollTime = "";
+  let isOperatorMode = false;
+
+  /** Send GA4 event (works if gtag is on the page, silently skips otherwise). */
+  function trackEvent(eventName, params) {
+    try { if (window.gtag) window.gtag("event", eventName, params); } catch(_) {}
+  }
 
   /* ───────────────────────────── KNOWLEDGE BASE ───────────────────────────── */
 
@@ -656,6 +679,7 @@
       launcher.classList.add("fc-open");
       badge.classList.add("fc-hidden");
       document.getElementById("fc-input").focus();
+      trackEvent("francesca_chat_open", { session_id: sessionId });
       if (!welcomed) {
         welcomed = true;
         addBotMessage(
@@ -752,6 +776,8 @@
         body: JSON.stringify({
           message: message,
           history: conversationHistory.slice(-MAX_HISTORY),
+          session_id: sessionId,
+          page: window.location.href,
         }),
         signal: controller.signal,
       });
@@ -780,6 +806,7 @@
     input.value = "";
     clearQuickReplies();
     showTyping();
+    trackEvent("francesca_chat_message", { session_id: sessionId, message_length: text.length });
 
     // Track user message in history
     conversationHistory.push({ role: "user", content: text });
@@ -837,6 +864,36 @@
         document.getElementById("fc-chat-badge").classList.remove("fc-hidden");
       }
     }, 3000);
+
+    // Start polling for operator messages
+    startOperatorPolling();
+  }
+
+  /** Poll for operator (human) messages every 4 seconds. */
+  function startOperatorPolling() {
+    if (pollTimer) return;
+    pollTimer = setInterval(async () => {
+      if (!sessionId) return;
+      try {
+        const url = POLL_URL + "?session_id=" + encodeURIComponent(sessionId)
+          + (lastPollTime ? "&after=" + encodeURIComponent(lastPollTime) : "");
+        const res = await fetch(url);
+        if (!res.ok) return;
+        const data = await res.json();
+
+        if (data.session_status === "live" && !isOperatorMode) {
+          isOperatorMode = true;
+        }
+
+        if (data.messages && data.messages.length > 0) {
+          data.messages.forEach((m) => {
+            addBotMessage("\u{1F469} **Francesca:** " + m.content);
+            conversationHistory.push({ role: "assistant", content: m.content });
+            if (m.created_at) lastPollTime = m.created_at;
+          });
+        }
+      } catch (_e) { /* ignore polling errors */ }
+    }, 4000);
   }
 
   // Boot when DOM is ready
