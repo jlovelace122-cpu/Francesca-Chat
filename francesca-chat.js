@@ -787,6 +787,9 @@
       if (!res.ok) return null;
 
       const data = await res.json();
+      if (data.status === "ok" && data.live) {
+        return "__LIVE__";
+      }
       if (data.status === "ok" && data.reply) {
         return data.reply;
       }
@@ -814,6 +817,12 @@
     // Try AI-powered API first, fall back to local keyword matcher
     let reply = await callAPI(text);
     let isAI = !!reply;
+
+    // If operator is live, don't send a bot reply — operator will respond via polling
+    if (reply === "__LIVE__") {
+      hideTyping();
+      return;
+    }
 
     if (!reply) {
       // Simulate brief thinking time for local responses

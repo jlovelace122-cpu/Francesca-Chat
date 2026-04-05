@@ -308,6 +308,27 @@ def chat():
     except Exception:
         pass  # Don't let DB errors break the chat
 
+    # ── If an operator has taken over (status='live'), don't send a bot reply ──
+    try:
+        from api._db import execute as db_exec, rows_to_dicts
+        if session_id:
+            status_rs = db_exec(
+                "SELECT status FROM chat_sessions WHERE id = ? LIMIT 1",
+                [session_id],
+            )
+            status_list = rows_to_dicts(status_rs)
+            if status_list and status_list[0].get("status") == "live":
+                resp = jsonify({
+                    "status": "ok",
+                    "reply": None,
+                    "session_id": session_id,
+                    "live": True,
+                })
+                resp.headers.update(cors)
+                return resp
+    except Exception:
+        pass  # If check fails, fall through to bot reply
+
     api_key = os.environ.get("OPENAI_API_KEY", "")
     if not api_key:
         resp = jsonify({"status": "error", "error": "AI service not configured."})
